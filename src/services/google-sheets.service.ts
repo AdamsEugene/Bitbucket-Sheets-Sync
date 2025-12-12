@@ -36,6 +36,13 @@ export class GoogleSheetsService {
       "Date",
       "Parents",
       "Repository",
+      "Files Count",
+      "Additions",
+      "Deletions",
+      "Commit URL",
+      "Diff URL",
+      "Summary",
+      "Files List",
     ];
     const rows = commits.map((c) => [
       c.hash,
@@ -46,6 +53,13 @@ export class GoogleSheetsService {
       c.date,
       c.parentHashes.join(", "),
       c.repository,
+      c.filesChangedCount || 0,
+      c.totalAdditions || 0,
+      c.totalDeletions || 0,
+      c.commitUrl || "",
+      c.diffUrl || "",
+      c.summary || "",
+      c.filesChanged.map((f) => `${f.path} (${f.status})`).join("; "),
     ]);
 
     await this.sheets.spreadsheets.values.update({
@@ -118,7 +132,7 @@ export class GoogleSheetsService {
                 sheetId,
                 dimension: "COLUMNS",
                 startIndex: 0,
-                endIndex: 8,
+                endIndex: 16,
               },
             },
           },
