@@ -31,14 +31,7 @@ export class GoogleSheetsService {
       "Hash",
       "Short Hash",
       "Message",
-      "Author",
-      "Email",
       "Date",
-      "Parents",
-      "Repository",
-      "Files Count",
-      "Additions",
-      "Deletions",
       "Commit URL",
       "Diff URL",
       "Summary",
@@ -47,25 +40,20 @@ export class GoogleSheetsService {
     const rows = commits.map((c) => [
       c.hash,
       c.shortHash,
-      c.message,
-      c.author,
-      c.authorEmail,
+      this.formatMessageWithLinks(c.message),
       c.date,
-      c.parentHashes.join(", "),
-      c.repository,
-      c.filesChangedCount || 0,
-      c.totalAdditions || 0,
-      c.totalDeletions || 0,
-      c.commitUrl || "",
-      c.diffUrl || "",
+      c.commitUrl ? `=HYPERLINK("${c.commitUrl}","View Commit")` : "",
+      c.diffUrl ? `=HYPERLINK("${c.diffUrl}","View Diff")` : "",
       c.summary || "",
       c.filesChanged.map((f) => `${f.path} (${f.status})`).join("; "),
     ]);
 
+    // Write the data - use USER_ENTERED so HYPERLINK formulas work
+    // Messages are plain text with URLs that Google Sheets will auto-detect
     await this.sheets.spreadsheets.values.update({
       spreadsheetId: this.spreadsheetId,
       range: `${sheetName}!A1`,
-      valueInputOption: "RAW",
+      valueInputOption: "USER_ENTERED", // Needed for HYPERLINK formulas in URL columns
       requestBody: { values: [headers, ...rows] },
     });
 
@@ -95,6 +83,28 @@ export class GoogleSheetsService {
       spreadsheetId: this.spreadsheetId,
       range: `${sheetName}!A:Z`,
     });
+  }
+
+  private formatMessageWithLinks(message: string): string {
+    const jiraBaseUrl = "https://heatmap-dot-com.atlassian.net/browse/";
+
+    let formattedMessage = message;
+
+    // Handle ticket IDs at the start of message (e.g., "IMF-3216\nAdded site...")
+    // Convert ticket ID to full URL - Google Sheets will auto-detect and make it clickable
+    const ticketIdAtStartPattern = /^([A-Z]+-\d+)(\n|$)/;
+    formattedMessage = formattedMessage.replace(
+      ticketIdAtStartPattern,
+      (match, ticketId, after) => {
+        const url = `${jiraBaseUrl}${ticketId}`;
+        return `${url}${after}`;
+      }
+    );
+
+    // Full URLs are already present and will be auto-detected by Google Sheets
+    // No need to convert them - just keep them as-is
+
+    return formattedMessage;
   }
 
   private async formatHeader(sheetName: string): Promise<void> {
@@ -132,7 +142,7 @@ export class GoogleSheetsService {
                 sheetId,
                 dimension: "COLUMNS",
                 startIndex: 0,
-                endIndex: 16,
+                endIndex: 8,
               },
             },
           },
